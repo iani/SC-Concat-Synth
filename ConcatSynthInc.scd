@@ -113,7 +113,7 @@ SynthDef("argenvsine2", {
 
 SynthDef("argenvsine2", { | gate = 1 |
 	var env, envctl;
-	// make a dummy 8 segment envelope
+	// make a dummy 80 segment envelope
 	env = Env.newClear(80);
 	
 	// create a control argument array
@@ -121,7 +121,7 @@ SynthDef("argenvsine2", { | gate = 1 |
 	Out.ar(0, SinOsc.ar(EnvGen.kr (envctl, gate: gate, doneAction: 0), 0, 0.2));
 }).add
 
-//: testing vversion with gate
+//: testing version with gate
 
 ~test = Synth ("argenvsine2", [env: Env ((60..72).midicps, 0.25 ! 12, \step)]);
 
@@ -131,7 +131,7 @@ SynthDef("argenvsine2", { | gate = 1 |
 
 ~test.set (\env, (Env((60..72).midicps.reverse, 0.1 ! 12, \step).asArray), \gate, 0);
 
-//: Next: Can we use Changed.kr instead of setting gate to 0 then 1 manuallY?
+//: Next: Use Changed.kr instead of setting gate to 0 then 1 explicitly
 
 SynthDef ("changetest", { | change = 0 |
 	var env;
@@ -147,7 +147,6 @@ SynthDef ("changetest", { | change = 0 |
 ~test.set (\change, 2);
 
 //: testing 2
-
 {
 	var synth, stream;
 	synth = Synth ("changetest");
@@ -156,5 +155,4 @@ SynthDef ("changetest", { | change = 0 |
 		[0.1, 0.2].choose.wait;
 		synth.set (\change, stream.next);
 	}
-	
 }.fork;
