@@ -1,6 +1,9 @@
+// Here developing the code bottom-up step by step,
+// based on examples from help files and elsewhere
+//  2 May 2017 15:18
+
 
 //: record test buffer
-
 {
 	var sound;
 	Server.default.prepareForRecord;
@@ -24,7 +27,6 @@
 
 //: start with simple BufRd synth
 // From help file
-
 { BufRd.ar(2, ~buffer, Phasor.ar(0, BufRateScale.kr(~buffer), 0, BufFrames.kr(~buffer))) }.play;
 
 //: mod 1: Use line instead of phasor
@@ -67,7 +69,92 @@ s.sendBundle(nil,[\s_new, \env, 1003, 2, 1001],[\n_setn, 1003, \env, f.size] ++ 
 
 s.sendMsg(\n_free, 1001);
 
+//: mod 2 step b: Test custom envelope on synth directly
 
+SynthDef("argenvsine", {
+	var env, envctl;
+	// make a dummy 8 segment envelope
+	env = Env.newClear(80);
+	
+	// create a control argument array
+	envctl = Control.names([\env]).kr( env.asArray );
+	Out.ar(0, SinOsc.ar(EnvGen.kr (envctl, doneAction: 2), 0, 0.2));
+}).add
 
+//: Testing mod 2 step b, single synths
 
+Synth ("argenvsine", [env: Env ([60, 65, 63, 72, 72].midicps, [1, 1, 1, 3], \sine)]);
 
+Synth ("argenvsine", [env: Env ([60, 65, 63, 72, 72].midicps, [1, 1, 1, 3], \hold)]);
+
+Synth ("argenvsine", [env: Env ((60..72).midicps, 0.25 ! 12, \step)]);
+
+//: Testing mod 2 step b, restarting env on running synth
+
+SynthDef("argenvsine2", {
+	var env, envctl;
+	// make a dummy 8 segment envelope
+	env = Env.newClear(80);
+	
+	// create a control argument array
+	envctl = Control.names([\env]).kr( env.asArray );
+	Out.ar(0, SinOsc.ar(EnvGen.kr (envctl, doneAction: 0), 0, 0.2));
+}).add
+
+//: Here is the synth
+
+~test = Synth ("argenvsine2", [env: Env ((60..72).midicps, 0.25 ! 12, \step)]);
+
+//:
+
+~test.set (\env, (Env((60..72).midicps, 0.25 ! 12, \step).asArray));
+
+//: I think we need a trigger to reset the envelope
+
+SynthDef("argenvsine2", { | gate = 1 |
+	var env, envctl;
+	// make a dummy 8 segment envelope
+	env = Env.newClear(80);
+	
+	// create a control argument array
+	envctl = Control.names([\env]).kr( env.asArray );
+	Out.ar(0, SinOsc.ar(EnvGen.kr (envctl, gate: gate, doneAction: 0), 0, 0.2));
+}).add
+
+//: testing vversion with gate
+
+~test = Synth ("argenvsine2", [env: Env ((60..72).midicps, 0.25 ! 12, \step)]);
+
+~test.set (\gate, 0);
+
+~test.set (\gate, 1;)
+
+~test.set (\env, (Env((60..72).midicps.reverse, 0.1 ! 12, \step).asArray), \gate, 0);
+
+//: Next: Can we use Changed.kr instead of setting gate to 0 then 1 manuallY?
+
+SynthDef ("changetest", { | change = 0 |
+	var env;
+	env = Env.perc;
+
+	Out.ar (0, WhiteNoise.ar (0.1) * EnvGen.kr (env, gate: Changed.kr (change), doneAction: 0))
+}).add;
+
+//: testing
+
+~test = Synth ("changetest");
+
+~test.set (\change, 2);
+
+//: testing 2
+
+{
+	var synth, stream;
+	synth = Synth ("changetest");
+	stream = Pseries (1, 1, inf).asStream;
+	500 do: {
+		[0.1, 0.2].choose.wait;
+		synth.set (\change, stream.next);
+	}
+	
+}.fork;
