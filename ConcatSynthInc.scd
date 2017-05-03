@@ -18,7 +18,7 @@
 	
 	Server.default.stopRecording;
 }.fork;
-//: load test buffer
+//: load test buffer 
 
 ~buffer = Buffer.read(Server.default, "./sample.aiff");
 
@@ -155,4 +155,55 @@ SynthDef ("changetest", { | change = 0 |
 		[0.1, 0.2].choose.wait;
 		synth.set (\change, stream.next);
 	}
-}.fork;
+}.fork; // OK, fine
+
+//: Try out basic env for BuRd
+
+~buffer = Buffer.read(Server.default, "./sample.aiff");
+
+//:
+~buffer.numFrames;
+
+~buffer.play;
+//:
+
+{
+	var env;
+	env = Env ([0, ~buffer.numFrames], [~buffer.numFrames / 44100]);
+	BufRd.ar(
+		2, ~buffer,
+		EnvGen.ar (env, 1, doneAction: 2)
+	)
+}.play
+
+//: Convert above into a synthdef
+
+SynthDef ("trigbufrdenv", { | buf |
+	var env;
+	env = Env ([0, buf.numFrames], [buf.numFrames / 44100]);
+	BufRd.ar(
+		2, buf,
+		EnvGen.ar (env, 1, doneAction: 2)
+	)
+});
+
+//: First try for a SynthDef that uses BufRd with Env
+
+SynthDef ("bufrdenv", { | buf, change = 0 |
+	var env, envctl;
+	env = Env.newClear (80);
+	envctl = Control.names ([\env]).kr (env.asArray);
+	Out.kr (0,
+		BufRd.ar (2, buf, EnvGen.ar (envctl, gate: Changed.kr (change), doneAction: 0))
+	);
+}).add;
+
+//:
+
+~synth = Synth ("bufrdenv", [buf: ~buffer]);
+
+//:
+
+~synth.set (\env, Env ([0, ~buffer.numFrames], [~buffer.numFrames / 44100]).asArray);
+~synth.set (\change, 1);
+
