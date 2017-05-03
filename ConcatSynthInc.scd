@@ -93,7 +93,7 @@ Synth ("argenvsine", [env: Env ((60..72).midicps, 0.25 ! 12, \step)]);
 
 SynthDef("argenvsine2", {
 	var env, envctl;
-	// make a dummy 8 segment envelope
+	// make a dummy 80 segment envelope
 	env = Env.newClear(80);
 	
 	// create a control argument array
@@ -131,6 +131,39 @@ SynthDef("argenvsine2", { | gate = 1 |
 
 ~test.set (\env, (Env((60..72).midicps.reverse, 0.1 ! 12, \step).asArray), \gate, 0);
 
+~test.set (\gate, 1;)
+
+//: Adapt this for playing with BufRd
+
+SynthDef("argenvbuf", { | gate = 1 |
+	var env, envctl;
+	// make a dummy 80 segment envelope
+	env = Env.newClear(80);
+	
+	// create a control argument array
+	envctl = Control.names([\env]).kr( env.asArray );
+	Out.ar(0,
+		BufRd.ar (2, ~buffer,
+			EnvGen.ar (envctl, gate: gate, doneAction: 0)));
+}).add
+
+//:
+~synth = Synth ("argenvbuf", [env: Env ([0, 44000, 0], [1, 1])]);
+
+~synth = Synth ("argenvbuf", [env: Env ([0, 44000, 0, 22000], [1, 0, 0.5])]);
+
+//:
+~synth.set (\gate, 0);
+
+//:
+~synth.set (\gate, 1);
+
+//:
+~synth.set (\gate, 0);
+
+//:
+~synth.set ([env: Env ([0, 22000, 0, 44000], [1, 0, 0.5]), gate: 1]);
+
 //: Next: Use Changed.kr instead of setting gate to 0 then 1 explicitly
 
 SynthDef ("changetest", { | change = 0 |
@@ -140,26 +173,46 @@ SynthDef ("changetest", { | change = 0 |
 	Out.ar (0, WhiteNoise.ar (0.1) * EnvGen.kr (env, gate: Changed.kr (change), doneAction: 0))
 }).add;
 
+//: Variant above to test different envelope
+
+SynthDef ("changetest2", { | change = 0 |
+	var env;
+	env = Env ([0, 0.2, 0], [0.01, 0.1]);
+
+	Out.ar (0, WhiteNoise.ar (0.1) * EnvGen.kr (env, gate: Changed.kr (change), doneAction: 0))
+}).add;
+
+//: Variant above to test same envelope with BufRd
+
+SynthDef ("changetest3", { | change = 0 |
+	var env;
+	env = Env ([0, 44000], [1]);
+
+	Out.ar (0,
+		BufRd.ar(2, ~buffer,
+			EnvGen.ar (env, gate: Changed.kr (change), doneAction: 0)))
+}).add;
+
 //: testing
 
-~test = Synth ("changetest");
+~test = Synth ("changetest3");
 
 ~test.set (\change, 2);
 
 //: testing 2
 {
 	var synth, stream;
-	synth = Synth ("changetest");
+	synth = Synth ("changetest3");
 	stream = Pseries (1, 1, inf).asStream;
 	500 do: {
-		[0.1, 0.2].choose.wait;
+		[1.5].choose.wait;
 		synth.set (\change, stream.next);
 	}
 }.fork; // OK, fine
 
 //: Try out basic env for BuRd
 
-~buffer = Buffer.read(Server.default, "./sample.aiff");
+~buffer = Buffer.read(Server.default, "sample.aiff");
 
 //:
 ~buffer.numFrames;
