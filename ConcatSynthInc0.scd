@@ -18,7 +18,7 @@
 	
 	Server.default.stopRecording;
 }.fork;
-//: load test buffer 
+//: load test buffer
 
 ~buffer = Buffer.read(Server.default, "./sample.aiff");
 
@@ -31,8 +31,7 @@
 
 //: mod 1: Use line instead of phasor
 { BufRd.ar(2, ~buffer,
-	Line.ar(0, BufFrames.kr(~buffer) * 0.75, 0.7
-		5))
+	Line.ar(0, BufFrames.kr(~buffer) * 0.75, 0.75))
 }.play;
 
 //: mod 2: Use envelope
@@ -93,7 +92,7 @@ Synth ("argenvsine", [env: Env ((60..72).midicps, 0.25 ! 12, \step)]);
 
 SynthDef("argenvsine2", {
 	var env, envctl;
-	// make a dummy 80 segment envelope
+	// make a dummy 8 segment envelope
 	env = Env.newClear(80);
 	
 	// create a control argument array
@@ -131,39 +130,6 @@ SynthDef("argenvsine2", { | gate = 1 |
 
 ~test.set (\env, (Env((60..72).midicps.reverse, 0.1 ! 12, \step).asArray), \gate, 0);
 
-~test.set (\gate, 1;)
-
-//: Adapt this for playing with BufRd
-
-SynthDef("argenvbuf", { | gate = 1 |
-	var env, envctl;
-	// make a dummy 80 segment envelope
-	env = Env.newClear(80);
-	
-	// create a control argument array
-	envctl = Control.names([\env]).kr( env.asArray );
-	Out.ar(0,
-		BufRd.ar (2, ~buffer,
-			EnvGen.ar (envctl, gate: gate, doneAction: 0)));
-}).add
-
-//:
-~synth = Synth ("argenvbuf", [env: Env ([0, 44000, 0], [1, 1])]);
-
-~synth = Synth ("argenvbuf", [env: Env ([0, 44000, 0, 22000], [1, 0, 0.5])]);
-
-//:
-~synth.set (\gate, 0);
-
-//:
-~synth.set (\gate, 1);
-
-//:
-~synth.set (\gate, 0);
-
-//:
-~synth.set ([env: Env ([0, 22000, 0, 44000], [1, 0, 0.5]), gate: 1]);
-
 //: Next: Use Changed.kr instead of setting gate to 0 then 1 explicitly
 
 SynthDef ("changetest", { | change = 0 |
@@ -173,46 +139,26 @@ SynthDef ("changetest", { | change = 0 |
 	Out.ar (0, WhiteNoise.ar (0.1) * EnvGen.kr (env, gate: Changed.kr (change), doneAction: 0))
 }).add;
 
-//: Variant above to test different envelope
-
-SynthDef ("changetest2", { | change = 0 |
-	var env;
-	env = Env ([0, 0.2, 0], [0.01, 0.1]);
-
-	Out.ar (0, WhiteNoise.ar (0.1) * EnvGen.kr (env, gate: Changed.kr (change), doneAction: 0))
-}).add;
-
-//: Variant above to test same envelope with BufRd
-
-SynthDef ("changetest3", { | change = 0 |
-	var env;
-	env = Env ([0, 44000], [1]);
-
-	Out.ar (0,
-		BufRd.ar(2, ~buffer,
-			EnvGen.ar (env, gate: Changed.kr (change), doneAction: 0)))
-}).add;
-
 //: testing
 
-~test = Synth ("changetest3");
+~test = Synth ("changetest");
 
 ~test.set (\change, 2);
 
 //: testing 2
 {
 	var synth, stream;
-	synth = Synth ("changetest3");
+	synth = Synth ("changetest");
 	stream = Pseries (1, 1, inf).asStream;
 	500 do: {
-		[1.5].choose.wait;
+		[0.1, 0.2].choose.wait;
 		synth.set (\change, stream.next);
 	}
 }.fork; // OK, fine
 
 //: Try out basic env for BuRd
 
-~buffer = Buffer.read(Server.default, "sample.aiff");
+~buffer = Buffer.read(Server.default, "./sample.aiff");
 
 //:
 ~buffer.numFrames;
@@ -231,16 +177,57 @@ SynthDef ("changetest3", { | change = 0 |
 
 //: Convert above into a synthdef
 
-SynthDef ("trigbufrdenv", { | buf |
+SynthDef ("trigbufrdenv", { | buf, start = 0, end = 20000, dur = 1 |
 	var env;
-	env = Env ([0, buf.numFrames], [buf.numFrames / 44100]);
-	BufRd.ar(
+	env = Env ([start, end], [dur]);
+	Out.ar (0, BufRd.ar(
+		2, buf,
+		Line.ar(0 * BufSampleRate.kr(buf), BufFrames.kr(buf) * 0.75, 0.75)
+		//EnvGen.ar (env, 1, doneAction: 2)
+			  ))
+}).send;
+
+//: Convert above into a synthdef
+
+SynthDef ("trigbufrdenv", { | buf, start = 0, end = 1, dur = 1 |
+	var env, samplerate;
+	samplerate = BufSampleRate.kr (buf);
+   	env = Env ([start * samplerate, end * samplerate], [dur]);
+	Out.ar (0, BufRd.ar(
 		2, buf,
 		EnvGen.ar (env, 1, doneAction: 2)
-	)
-});
+			  ))
+}).send;
+
+//:
+
+Synth ("trigbufrdenv", [buf: ~buffer, dur: 2.5]);
+
+
+//: Add triggering with new values
+
+SynthDef ("trigbufrdenv2", { | buf, start = 0, end = 1, dur = 1, trig = 0 |
+	var env, samplerate;
+	samplerate = BufSampleRate.kr (buf);
+   	env = Env ([start * samplerate, end * samplerate], [dur]);
+	Out.ar (0, BufRd.ar(
+		2, buf,
+		EnvGen.ar (env, Changed.kr (trig), doneAction: 0)
+			  ))
+}).send;
+
+//:
+
+~synth = Synth ("trigbufrdenv2", [buf: ~buffer, dur: 2.5]);
+
+//:
+~synth.set (\trig, 1);
+
+//:
+~synth.set (\env, \trig, 2);
 
 //: First try for a SynthDef that uses BufRd with Env
+// This is too big a step, and failed.
 
 SynthDef ("bufrdenv", { | buf, change = 0 |
 	var env, envctl;
@@ -259,4 +246,3 @@ SynthDef ("bufrdenv", { | buf, change = 0 |
 
 ~synth.set (\env, Env ([0, ~buffer.numFrames], [~buffer.numFrames / 44100]).asArray);
 ~synth.set (\change, 1);
-
